@@ -53,30 +53,28 @@ int main()
 
     cap >> prevFrame;
     prevGray = conversion_gray(prevFrame);
-    resultado = cv::Mat::zeros(prevGray.rows, prevGray.cols, CV_8UC1);
+    diff = cv::Mat(prevGray.rows, prevGray.cols, CV_8UC1);
+    resultado = cv::Mat(prevGray.rows, prevGray.cols, CV_8UC1);
 
     while(true){
+
         cap >> frame;
-        frame = conversion_gray(frame);
-        diff = cv::Mat(frame.rows, frame.cols, CV_8UC1);
-        
-        double threshold_value = 0.05;
-        for(int i = 0; i < frame.rows; i++){
-            for(int j = 0; j < frame.cols; j++){
-                frame.at<uchar>(i, j) = frame.at<uchar>(i, j)*threshold_value;
-                prevGray.at<uchar>(i, j) = prevGray.at<uchar>(i, j)*(1 - threshold_value);
-                diff.at<uchar>(i, j) = frame.at<uchar>(i, j) + prevGray.at<uchar>(i, j);
+        if (frame.empty()) break;
+        grayFrame = conversion_gray(frame);
+
+        double threshold_value = 0.1;
+        for(int i = 0; i < grayFrame.rows; i++){
+            for(int j = 0; j < grayFrame.cols; j++){
+                // Media exponencial del fondo: fondo = alpha*actual + (1-alpha)*fondo_anterior
+                diff.at<uchar>(i, j) = (uchar)(grayFrame.at<uchar>(i, j) * threshold_value
+                                              + prevGray.at<uchar>(i, j) * (1 - threshold_value));
+                // Deteccion: diferencia absoluta entre frame actual y modelo de fondo
+                resultado.at<uchar>(i, j) = (uchar)std::abs((int)grayFrame.at<uchar>(i, j) - (int)diff.at<uchar>(i, j));
             }
         }
-        imshow("Diferencia", diff);
-        resultado.setTo(0); // Asegura que la imagen resultado esté completamente en negro antes de actualizarla
-        for(int i = 0; i < frame.rows; i++){
-            for(int j = 0; j < frame.cols; j++){
-                resultado.at<uchar>(i, j) = abs(diff.at<uchar>(i, j) - frame.at<uchar>(i, j));
-            }
-        }
-        prevGray = resultado.clone();
-        imshow("Resultado", resultado);
+        prevGray = diff.clone();
+        imshow("Fondo (EMA)", diff);
+        imshow("Deteccion de movimiento", resultado);
         if (waitKey(30) >= 0) break;
     }
     cv::destroyAllWindows();
